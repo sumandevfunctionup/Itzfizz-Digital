@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import Image from "next/image";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -35,10 +35,11 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
   const box3Ref = useRef<HTMLDivElement>(null);
   const box4Ref = useRef<HTMLDivElement>(null);
 
-  // Telemetry HUD state
-  const [speedMph, setSpeedMph] = useState(0);
-  const [currentGear, setCurrentGear] = useState("P");
-  const [progressPct, setProgressPct] = useState(0);
+  // High-performance direct DOM telemetry refs (Eliminates React re-renders during scroll)
+  const speedDisplayRef = useRef<HTMLSpanElement>(null);
+  const gearDisplayRef = useRef<HTMLDivElement>(null);
+  const progressDisplayRef = useRef<HTMLSpanElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!containerRef.current || !carRef.current || !trailRef.current) return;
@@ -54,11 +55,11 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
     ].filter(Boolean) as HTMLDivElement[];
 
     // -------------------------------------------------------------
-    // 1. INITIAL LOAD ANIMATION (Requirement #2)
+    // 1. INITIAL LOAD ANIMATION (Requirement #2 - GSAP Timeline)
     // -------------------------------------------------------------
     const introTl = gsap.timeline();
 
-    // 1a. Letters initial reveal
+    // 1a. Letters initial staggered entrance
     introTl.fromTo(
       letterEls,
       { opacity: 0, y: 15 },
@@ -66,12 +67,12 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
         opacity: 0.25,
         y: 0,
         duration: 0.8,
-        stagger: 0.04,
+        stagger: 0.035,
         ease: "power3.out",
       }
     );
 
-    // 1b. The 4 Stat Boxes animate in on page load (smoothly visible)
+    // 1b. The 4 Stat Boxes animate in on page load (one by one with subtle delay)
     introTl.fromTo(
       boxEls,
       { opacity: 0, scale: 0.9, y: (i) => (i % 2 === 0 ? -15 : 15) },
@@ -79,14 +80,14 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
         opacity: 0.65,
         scale: 1,
         y: 0,
-        duration: 0.7,
+        duration: 0.65,
         stagger: 0.12,
         ease: "back.out(1.2)",
       },
       "-=0.4"
     );
 
-    // 1c. Car rolls into start line
+    // 1c. Car rolls into start position
     introTl.fromTo(
       carEl,
       { x: -160, opacity: 0 },
@@ -95,9 +96,10 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
     );
 
     // -------------------------------------------------------------
-    // 2. SCROLL-BASED ANIMATION (Requirement #3)
+    // 2. SCROLL-BASED ANIMATION (Requirement #3 & #4 - GPU Accelerated)
     // -------------------------------------------------------------
     const ctx = gsap.context(() => {
+      // ⚡ OPTIMIZATION 1: Pre-calculate & cache road dimensions
       const getDimensions = () => {
         const roadWidth = window.innerWidth;
         const carWidth = carEl.offsetWidth || 340;
@@ -108,66 +110,61 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
 
       let dims = getDimensions();
 
+      // ⚡ OPTIMIZATION 2: Pre-compute letter coordinates to eliminate layout reflows in scroll loop
+      const cacheLetterPositions = () => {
+        return letterEls.map((letter) => {
+          const rect = letter.getBoundingClientRect();
+          return rect.left;
+        });
+      };
+
+      let cachedLetterLefts = cacheLetterPositions();
+
+      // Master ScrollTrigger for buttery 60-120fps scrubbing
       const mainScrollTrigger = ScrollTrigger.create({
         trigger: containerRef.current,
         start: "top top",
         end: "bottom top",
-        scrub: 1, // Smooth kinetic interpolation
+        scrub: 1, // Smooth kinetic momentum
         pin: trackRef.current,
         anticipatePin: 1,
         onUpdate: (self) => {
           const progress = self.progress;
 
           // By 86% of the scroll track, the car has completely driven off-screen to the right!
-          // The remaining scroll leaves the full illuminated headline cleanly visible.
           const carProgress = Math.min(1, progress / 0.86);
           const currentX = carProgress * dims.totalTravel;
           const carFrontX = currentX + dims.carWidth * 0.85;
 
-          // Translate vehicle
-          gsap.set(carEl, { x: currentX });
+          // ⚡ OPTIMIZATION 3: Pure GPU translate3d (Hardware compositing)
+          gsap.set(carEl, { x: currentX, force3D: true });
 
-          // Expand green trail behind car, fully filling road once car clears
-          const trailWidth = Math.min(dims.roadWidth, currentX + dims.carWidth * 0.2);
-          gsap.set(trailEl, { width: trailWidth });
+          // ⚡ OPTIMIZATION 4: Pure GPU scaleX for trail (Zero DOM layout reflow)
+          const trailScale = Math.min(1, Math.max(0, (currentX + dims.carWidth * 0.2) / dims.roadWidth));
+          gsap.set(trailEl, { scaleX: trailScale, transformOrigin: "left center", force3D: true });
 
-          // Letter reactive illumination
-          letterEls.forEach((letter) => {
-            const rect = letter.getBoundingClientRect();
-            if (carFrontX >= rect.left) {
+          // ⚡ OPTIMIZATION 5: Read from cached coordinates (0 getBoundingClientRect calls during scroll!)
+          for (let i = 0; i < letterEls.length; i++) {
+            const letter = letterEls[i];
+            const letterLeft = cachedLetterLefts[i];
+            if (carFrontX >= letterLeft) {
               if (!letter.classList.contains("active")) {
                 letter.classList.add("active");
-                gsap.to(letter, {
-                  color: "#ffffff",
-                  opacity: 1,
-                  scale: 1.05,
-                  duration: 0.15,
-                  overwrite: "auto",
-                });
               }
             } else {
               if (letter.classList.contains("active")) {
                 letter.classList.remove("active");
-                gsap.to(letter, {
-                  color: "#ffffff",
-                  opacity: 0.25,
-                  scale: 1,
-                  duration: 0.15,
-                  overwrite: "auto",
-                });
               }
             }
-          });
+          }
 
-          // Telemetry Speedometer calculation
+          // ⚡ OPTIMIZATION 6: High-frequency DOM telemetry updates without React re-render overhead
           const velocity = Math.abs(self.getVelocity() || 0);
           const computedMph = Math.min(
             195,
             Math.round(velocity / 16 + (progress > 0.02 ? 35 : 0))
           );
-          setSpeedMph(computedMph);
 
-          // Gear selector
           let gear = "P";
           if (progress > 0.01) {
             if (computedMph > 140) gear = "7";
@@ -178,13 +175,17 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
             else if (computedMph > 15) gear = "2";
             else gear = "1";
           }
-          setCurrentGear(gear);
 
           const pct = Math.round(progress * 100);
-          setProgressPct(pct);
+
+          if (speedDisplayRef.current) speedDisplayRef.current.textContent = `${computedMph}`;
+          if (gearDisplayRef.current) gearDisplayRef.current.textContent = gear;
+          if (progressDisplayRef.current) progressDisplayRef.current.textContent = `${pct}%`;
+          if (progressBarRef.current) progressBarRef.current.style.width = `${pct}%`;
+
           onScrollProgressUpdate(pct);
 
-          // Engine SFX
+          // Engine Sound Pitch Modulation
           if (soundEnabled) {
             engineSound.setThrottle(Math.min(1, velocity / 2000));
           }
@@ -192,7 +193,7 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
       });
 
       // -----------------------------------------------------------
-      // 3. STAT BOXES HIGHLIGHT ON SCROLL MILESTONES
+      // 3. STAT BOXES SCROLL TRIGGER HIGHLIGHTS
       // -----------------------------------------------------------
 
       // Box 1: 58% (Top Left)
@@ -255,14 +256,21 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
         });
       }
 
+      // Debounced resize handler recalibrates cached values smoothly
+      let resizeTimer: NodeJS.Timeout;
       const handleResize = () => {
-        dims = getDimensions();
-        ScrollTrigger.refresh();
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          dims = getDimensions();
+          cachedLetterLefts = cacheLetterPositions();
+          ScrollTrigger.refresh();
+        }, 150);
       };
 
       window.addEventListener("resize", handleResize);
 
       return () => {
+        clearTimeout(resizeTimer);
         window.removeEventListener("resize", handleResize);
         mainScrollTrigger.kill();
       };
@@ -286,15 +294,11 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
         <div className="absolute inset-0 bg-radial from-transparent via-[#121212]/60 to-[#0a0a0a] pointer-events-none" />
 
         {/* ------------------------------------------------------------- */}
-        {/* STAT BOX 1: 58% (Top Left - Well below the navbar) */}
+        {/* STAT BOX 1: 58% (Top Left - Safely below navbar) */}
         {/* ------------------------------------------------------------- */}
         <div
           ref={box1Ref}
-          className="absolute z-20 pointer-events-none transition-all duration-300 rounded-2xl bg-[#def54f] text-[#111] px-5 py-4 sm:px-6 sm:py-5 shadow-xl flex flex-col justify-center w-[210px] sm:w-[260px]"
-          style={{
-            top: "14%",
-            left: "6%",
-          }}
+          className="absolute z-20 pointer-events-none transition-all duration-300 rounded-2xl bg-[#def54f] text-[#111] px-5 py-4 sm:px-6 sm:py-5 shadow-xl flex flex-col justify-center w-[210px] sm:w-[260px] top-16 sm:top-20 left-4 sm:left-10"
         >
           <span className="text-3xl sm:text-5xl font-black font-mono tracking-tight text-[#111]">
             58%
@@ -305,15 +309,11 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
         </div>
 
         {/* ------------------------------------------------------------- */}
-        {/* STAT BOX 3: 27% (Top Right - Well below the navbar) */}
+        {/* STAT BOX 3: 27% (Top Right - Safely below navbar) */}
         {/* ------------------------------------------------------------- */}
         <div
           ref={box3Ref}
-          className="absolute z-20 pointer-events-none transition-all duration-300 rounded-2xl bg-[#262a34] text-white border border-white/10 px-5 py-4 sm:px-6 sm:py-5 shadow-xl flex flex-col justify-center w-[210px] sm:w-[260px]"
-          style={{
-            top: "14%",
-            right: "6%",
-          }}
+          className="absolute z-20 pointer-events-none transition-all duration-300 rounded-2xl bg-[#262a34] text-white border border-white/10 px-5 py-4 sm:px-6 sm:py-5 shadow-xl flex flex-col justify-center w-[210px] sm:w-[260px] top-16 sm:top-20 right-4 sm:right-10"
         >
           <span className="text-3xl sm:text-5xl font-black font-mono tracking-tight text-emerald-400">
             27%
@@ -336,11 +336,11 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
           {/* Road Center Dashed Line */}
           <div className="absolute top-1/2 left-0 right-0 h-0.5 -translate-y-1/2 road-centerline pointer-events-none opacity-30 z-0" />
 
-          {/* Dynamic Green Trail Behind Car */}
+          {/* Dynamic Green Trail Behind Car (scaleX GPU transform) */}
           <div
             ref={trailRef}
-            className="absolute top-0 left-0 h-full trail-glow z-1 pointer-events-none"
-            style={{ width: 0 }}
+            className="absolute top-0 left-0 h-full w-full trail-glow z-1 pointer-events-none origin-left"
+            style={{ transform: "scaleX(0)" }}
           />
 
           {/* Letter-Spaced Headline (WELCOME ITZFIZZ) */}
@@ -395,15 +395,11 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
         </div>
 
         {/* ------------------------------------------------------------- */}
-        {/* STAT BOX 2: 23% (Bottom Left - Well above screen bottom) */}
+        {/* STAT BOX 2: 23% (Bottom Left - Safely above screen bottom) */}
         {/* ------------------------------------------------------------- */}
         <div
           ref={box2Ref}
-          className="absolute z-20 pointer-events-none transition-all duration-300 rounded-2xl bg-[#6ac9ff] text-[#111] px-5 py-4 sm:px-6 sm:py-5 shadow-xl flex flex-col justify-center w-[210px] sm:w-[260px]"
-          style={{
-            bottom: "14%",
-            left: "6%",
-          }}
+          className="absolute z-20 pointer-events-none transition-all duration-300 rounded-2xl bg-[#6ac9ff] text-[#111] px-5 py-4 sm:px-6 sm:py-5 shadow-xl flex flex-col justify-center w-[210px] sm:w-[260px] bottom-16 sm:bottom-20 left-4 sm:left-10"
         >
           <span className="text-3xl sm:text-5xl font-black font-mono tracking-tight text-[#111]">
             23%
@@ -414,15 +410,11 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
         </div>
 
         {/* ------------------------------------------------------------- */}
-        {/* STAT BOX 4: 40% (Bottom Right - Well above screen bottom) */}
+        {/* STAT BOX 4: 40% (Bottom Right - Safely above screen bottom) */}
         {/* ------------------------------------------------------------- */}
         <div
           ref={box4Ref}
-          className="absolute z-20 pointer-events-none transition-all duration-300 rounded-2xl bg-[#fa7328] text-[#111] px-5 py-4 sm:px-6 sm:py-5 shadow-xl flex flex-col justify-center w-[210px] sm:w-[260px]"
-          style={{
-            bottom: "14%",
-            right: "6%",
-          }}
+          className="absolute z-20 pointer-events-none transition-all duration-300 rounded-2xl bg-[#fa7328] text-[#111] px-5 py-4 sm:px-6 sm:py-5 shadow-xl flex flex-col justify-center w-[210px] sm:w-[260px] bottom-16 sm:bottom-20 right-4 sm:right-10"
         >
           <span className="text-3xl sm:text-5xl font-black font-mono tracking-tight text-[#111]">
             40%
@@ -445,18 +437,18 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
           <span className="text-gray-600">|</span>
           <div className="flex items-center gap-1.5">
             <Gauge className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="font-bold text-white">{speedMph}</span>
+            <span ref={speedDisplayRef} className="font-bold text-white">0</span>
             <span className="text-[10px] text-gray-400">MPH</span>
           </div>
           <span className="text-gray-600">|</span>
           <div className="flex items-center gap-1.5">
             <span className="text-gray-400">GEAR:</span>
-            <span className="font-bold text-emerald-400">{currentGear}</span>
+            <div ref={gearDisplayRef} className="font-bold text-emerald-400">P</div>
           </div>
           <span className="text-gray-600">|</span>
           <div className="flex items-center gap-1.5">
             <span className="text-gray-400">PROGRESS:</span>
-            <span className="font-bold text-white">{progressPct}%</span>
+            <span ref={progressDisplayRef} className="font-bold text-white">0%</span>
           </div>
         </div>
       </div>
