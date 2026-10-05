@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { ScrollHero } from "@/components/ScrollHero";
-import { FeatureShowcase } from "@/components/FeatureShowcase";
 import { Footer } from "@/components/Footer";
 import { engineSound } from "@/utils/engineAudio";
 
@@ -41,9 +40,6 @@ export default function Home() {
         soundEnabled={soundEnabled}
         onScrollProgressUpdate={setScrollProgress}
       />
-
-      {/* Feature Showcase & Technical Architecture */}
-      <FeatureShowcase />
 
       {/* Footer */}
       <Footer />

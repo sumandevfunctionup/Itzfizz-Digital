@@ -38,23 +38,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* Center Live Telemetry Pill */}
-        <div className="hidden md:flex items-center gap-4 px-4 py-1.5 rounded-full glass-panel text-xs font-mono text-gray-300">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 hud-live-dot" />
-            <span className="text-gray-400">STATUS:</span>
-            <span className="text-emerald-400 font-semibold">
-              {scrollProgress > 95 ? "FINISH LINE" : scrollProgress > 5 ? "CRUISING" : "IDLE"}
-            </span>
-          </div>
-          <span className="text-gray-600">|</span>
-          <div className="flex items-center gap-1.5">
-            <span className="text-gray-400">DISTANCE:</span>
-            <span className="text-white font-semibold">
-              {Math.round(scrollProgress)}%
-            </span>
-          </div>
-        </div>
 
         {/* Right Action Buttons */}
         <div className="flex items-center gap-2.5">
