@@ -17,6 +17,7 @@ interface ScrollHeroProps {
 }
 
 const HEADLINE_TEXT = "WELCOME ITZFIZZ";
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 export const ScrollHero: React.FC<ScrollHeroProps> = ({
   soundEnabled,
@@ -378,7 +379,7 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
           >
             <div className="relative h-[150px] sm:h-[180px] w-[300px] sm:w-[370px] flex items-center">
               <Image
-                src="/images/car-top-view.png"
+                src={`${basePath}/images/car-top-view.png`}
                 alt="McLaren 720S Top View"
                 fill
                 priority
