@@ -55,16 +55,15 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
 
     // -------------------------------------------------------------
     // 1. INITIAL LOAD ANIMATION (Requirement #2)
-    // Headline appears smoothly + statistics animate in with subtle delay
     // -------------------------------------------------------------
     const introTl = gsap.timeline();
 
-    // 1a. Letters initial subtle reveal
+    // 1a. Letters initial reveal
     introTl.fromTo(
       letterEls,
       { opacity: 0, y: 15 },
       {
-        opacity: 0.2,
+        opacity: 0.25,
         y: 0,
         duration: 0.8,
         stagger: 0.04,
@@ -72,22 +71,22 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
       }
     );
 
-    // 1b. The 4 Stat Boxes animate in on page load (one by one with subtle delay)
+    // 1b. The 4 Stat Boxes animate in on page load (smoothly visible)
     introTl.fromTo(
       boxEls,
-      { opacity: 0, scale: 0.85, y: (i) => (i % 2 === 0 ? -20 : 20) },
+      { opacity: 0, scale: 0.9, y: (i) => (i % 2 === 0 ? -15 : 15) },
       {
-        opacity: 0.4,
+        opacity: 0.65,
         scale: 1,
         y: 0,
         duration: 0.7,
-        stagger: 0.15,
-        ease: "back.out(1.4)",
+        stagger: 0.12,
+        ease: "back.out(1.2)",
       },
       "-=0.4"
     );
 
-    // 1c. Car rolls into start position
+    // 1c. Car rolls into start line
     introTl.fromTo(
       carEl,
       { x: -160, opacity: 0 },
@@ -96,15 +95,15 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
     );
 
     // -------------------------------------------------------------
-    // 2. SCROLL-BASED ANIMATION (Core Feature - Requirement #3)
+    // 2. SCROLL-BASED ANIMATION (Requirement #3)
     // -------------------------------------------------------------
     const ctx = gsap.context(() => {
       const getDimensions = () => {
         const roadWidth = window.innerWidth;
-        const carWidth = carEl.offsetWidth || 300;
-        // The car drives COMPLETELY past the right edge so the entire text is fully revealed!
-        const endX = roadWidth + carWidth + 50;
-        return { roadWidth, carWidth, endX };
+        const carWidth = carEl.offsetWidth || 340;
+        // Total distance for the entire car to fully clear the right viewport
+        const totalTravel = roadWidth + carWidth + 80;
+        return { roadWidth, carWidth, totalTravel };
       };
 
       let dims = getDimensions();
@@ -118,17 +117,21 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
         anticipatePin: 1,
         onUpdate: (self) => {
           const progress = self.progress;
-          const currentX = progress * dims.endX;
+
+          // By 86% of the scroll track, the car has completely driven off-screen to the right!
+          // The remaining scroll leaves the full illuminated headline cleanly visible.
+          const carProgress = Math.min(1, progress / 0.86);
+          const currentX = carProgress * dims.totalTravel;
           const carFrontX = currentX + dims.carWidth * 0.85;
 
-          // GPU Transform translation for the vehicle
+          // Translate vehicle
           gsap.set(carEl, { x: currentX });
 
-          // Expand dynamic trail behind car (capped at road width)
+          // Expand green trail behind car, fully filling road once car clears
           const trailWidth = Math.min(dims.roadWidth, currentX + dims.carWidth * 0.2);
           gsap.set(trailEl, { width: trailWidth });
 
-          // Per-letter reactive illumination as car travels across
+          // Letter reactive illumination
           letterEls.forEach((letter) => {
             const rect = letter.getBoundingClientRect();
             if (carFrontX >= rect.left) {
@@ -147,7 +150,7 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
                 letter.classList.remove("active");
                 gsap.to(letter, {
                   color: "#ffffff",
-                  opacity: 0.2,
+                  opacity: 0.25,
                   scale: 1,
                   duration: 0.15,
                   overwrite: "auto",
@@ -189,66 +192,66 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
       });
 
       // -----------------------------------------------------------
-      // 3. STAT BOXES SCROLL TRIGGER MILESTONES
+      // 3. STAT BOXES HIGHLIGHT ON SCROLL MILESTONES
       // -----------------------------------------------------------
 
-      // Box 1: 58% (Top Left) - Triggers at ~15%-35% scroll
+      // Box 1: 58% (Top Left)
       if (box1Ref.current) {
         gsap.to(box1Ref.current, {
           scrollTrigger: {
             trigger: containerRef.current,
-            start: "top+=200 top",
-            end: "top+=500 top",
+            start: "top+=150 top",
+            end: "top+=450 top",
             scrub: 0.5,
           },
           opacity: 1,
-          scale: 1.05,
-          boxShadow: "0 20px 40px -10px rgba(222, 245, 79, 0.4)",
+          scale: 1.04,
+          boxShadow: "0 20px 35px -8px rgba(222, 245, 79, 0.45)",
         });
       }
 
-      // Box 2: 23% (Bottom Left) - Triggers at ~35%-60% scroll
+      // Box 2: 23% (Bottom Left)
       if (box2Ref.current) {
         gsap.to(box2Ref.current, {
           scrollTrigger: {
             trigger: containerRef.current,
-            start: "top+=550 top",
-            end: "top+=850 top",
+            start: "top+=450 top",
+            end: "top+=750 top",
             scrub: 0.5,
           },
           opacity: 1,
-          scale: 1.05,
-          boxShadow: "0 20px 40px -10px rgba(106, 201, 255, 0.4)",
+          scale: 1.04,
+          boxShadow: "0 20px 35px -8px rgba(106, 201, 255, 0.45)",
         });
       }
 
-      // Box 3: 27% (Top Right) - Triggers at ~60%-80% scroll
+      // Box 3: 27% (Top Right)
       if (box3Ref.current) {
         gsap.to(box3Ref.current, {
           scrollTrigger: {
             trigger: containerRef.current,
-            start: "top+=900 top",
-            end: "top+=1200 top",
+            start: "top+=750 top",
+            end: "top+=1050 top",
             scrub: 0.5,
           },
           opacity: 1,
-          scale: 1.05,
-          boxShadow: "0 20px 40px -10px rgba(69, 219, 125, 0.4)",
+          scale: 1.04,
+          boxShadow: "0 20px 35px -8px rgba(69, 219, 125, 0.45)",
         });
       }
 
-      // Box 4: 40% (Bottom Right) - Triggers at ~80%-100% scroll
+      // Box 4: 40% (Bottom Right)
       if (box4Ref.current) {
         gsap.to(box4Ref.current, {
           scrollTrigger: {
             trigger: containerRef.current,
-            start: "top+=1250 top",
-            end: "top+=1550 top",
+            start: "top+=1050 top",
+            end: "top+=1350 top",
             scrub: 0.5,
           },
           opacity: 1,
-          scale: 1.05,
-          boxShadow: "0 20px 40px -10px rgba(250, 115, 40, 0.4)",
+          scale: 1.04,
+          boxShadow: "0 20px 35px -8px rgba(250, 115, 40, 0.45)",
         });
       }
 
@@ -272,7 +275,7 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
     <div
       ref={containerRef}
       id="hero-scroll-section"
-      className="relative w-full h-[250vh] bg-[#121212]"
+      className="relative w-full h-[260vh] bg-[#121212]"
     >
       {/* Pinned 100vh Viewport Track (Clean, Spacious, Uncluttered) */}
       <div
@@ -283,41 +286,39 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
         <div className="absolute inset-0 bg-radial from-transparent via-[#121212]/60 to-[#0a0a0a] pointer-events-none" />
 
         {/* ------------------------------------------------------------- */}
-        {/* STAT BOX 1: 58% (Top Left) */}
+        {/* STAT BOX 1: 58% (Top Left - Well below the navbar) */}
         {/* ------------------------------------------------------------- */}
         <div
           ref={box1Ref}
-          className="absolute z-20 pointer-events-none transition-all duration-300 rounded-2xl bg-[#def54f] text-[#111] p-4 sm:p-6 shadow-xl flex flex-col justify-center w-[200px] sm:w-[250px]"
+          className="absolute z-20 pointer-events-none transition-all duration-300 rounded-2xl bg-[#def54f] text-[#111] px-5 py-4 sm:px-6 sm:py-5 shadow-xl flex flex-col justify-center w-[210px] sm:w-[260px]"
           style={{
-            top: "6%",
-            left: "5%",
-            opacity: 0.4,
+            top: "14%",
+            left: "6%",
           }}
         >
-          <span className="text-3xl sm:text-5xl font-extrabold font-mono tracking-tight text-[#111]">
+          <span className="text-3xl sm:text-5xl font-black font-mono tracking-tight text-[#111]">
             58%
           </span>
-          <span className="mt-1 text-xs sm:text-sm font-semibold leading-tight text-[#111]/90">
+          <span className="mt-1 text-xs sm:text-sm font-bold leading-tight text-[#111]/90">
             Increase in pick up point use
           </span>
         </div>
 
         {/* ------------------------------------------------------------- */}
-        {/* STAT BOX 3: 27% (Top Right) */}
+        {/* STAT BOX 3: 27% (Top Right - Well below the navbar) */}
         {/* ------------------------------------------------------------- */}
         <div
           ref={box3Ref}
-          className="absolute z-20 pointer-events-none transition-all duration-300 rounded-2xl bg-[#262a34] text-white border border-white/10 p-4 sm:p-6 shadow-xl flex flex-col justify-center w-[200px] sm:w-[250px]"
+          className="absolute z-20 pointer-events-none transition-all duration-300 rounded-2xl bg-[#262a34] text-white border border-white/10 px-5 py-4 sm:px-6 sm:py-5 shadow-xl flex flex-col justify-center w-[210px] sm:w-[260px]"
           style={{
-            top: "6%",
-            right: "5%",
-            opacity: 0.4,
+            top: "14%",
+            right: "6%",
           }}
         >
-          <span className="text-3xl sm:text-5xl font-extrabold font-mono tracking-tight text-emerald-400">
+          <span className="text-3xl sm:text-5xl font-black font-mono tracking-tight text-emerald-400">
             27%
           </span>
-          <span className="mt-1 text-xs sm:text-sm font-semibold leading-tight text-gray-200">
+          <span className="mt-1 text-xs sm:text-sm font-bold leading-tight text-gray-200">
             Increase in pick up point use
           </span>
         </div>
@@ -330,7 +331,7 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
           className="relative w-screen h-[180px] sm:h-[200px] bg-[#1a1c23] flex items-center overflow-hidden z-10 shadow-2xl"
         >
           {/* Top Race Curb */}
-          <div className="absolute top-0 left-0 right-0 h-2 road-curb-top z-30" />
+          <div className="absolute top-0 left-0 right-0 h-2.5 road-curb-top z-30" />
 
           {/* Road Center Dashed Line */}
           <div className="absolute top-1/2 left-0 right-0 h-0.5 -translate-y-1/2 road-centerline pointer-events-none opacity-30 z-0" />
@@ -390,45 +391,43 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
           </div>
 
           {/* Bottom Race Curb */}
-          <div className="absolute bottom-0 left-0 right-0 h-2 road-curb-bottom z-30" />
+          <div className="absolute bottom-0 left-0 right-0 h-2.5 road-curb-bottom z-30" />
         </div>
 
         {/* ------------------------------------------------------------- */}
-        {/* STAT BOX 2: 23% (Bottom Left) */}
+        {/* STAT BOX 2: 23% (Bottom Left - Well above screen bottom) */}
         {/* ------------------------------------------------------------- */}
         <div
           ref={box2Ref}
-          className="absolute z-20 pointer-events-none transition-all duration-300 rounded-2xl bg-[#6ac9ff] text-[#111] p-4 sm:p-6 shadow-xl flex flex-col justify-center w-[200px] sm:w-[250px]"
+          className="absolute z-20 pointer-events-none transition-all duration-300 rounded-2xl bg-[#6ac9ff] text-[#111] px-5 py-4 sm:px-6 sm:py-5 shadow-xl flex flex-col justify-center w-[210px] sm:w-[260px]"
           style={{
-            bottom: "8%",
-            left: "5%",
-            opacity: 0.4,
+            bottom: "14%",
+            left: "6%",
           }}
         >
-          <span className="text-3xl sm:text-5xl font-extrabold font-mono tracking-tight text-[#111]">
+          <span className="text-3xl sm:text-5xl font-black font-mono tracking-tight text-[#111]">
             23%
           </span>
-          <span className="mt-1 text-xs sm:text-sm font-semibold leading-tight text-[#111]/90">
+          <span className="mt-1 text-xs sm:text-sm font-bold leading-tight text-[#111]/90">
             Decreased in customer phone calls
           </span>
         </div>
 
         {/* ------------------------------------------------------------- */}
-        {/* STAT BOX 4: 40% (Bottom Right) */}
+        {/* STAT BOX 4: 40% (Bottom Right - Well above screen bottom) */}
         {/* ------------------------------------------------------------- */}
         <div
           ref={box4Ref}
-          className="absolute z-20 pointer-events-none transition-all duration-300 rounded-2xl bg-[#fa7328] text-[#111] p-4 sm:p-6 shadow-xl flex flex-col justify-center w-[200px] sm:w-[250px]"
+          className="absolute z-20 pointer-events-none transition-all duration-300 rounded-2xl bg-[#fa7328] text-[#111] px-5 py-4 sm:px-6 sm:py-5 shadow-xl flex flex-col justify-center w-[210px] sm:w-[260px]"
           style={{
-            bottom: "8%",
-            right: "5%",
-            opacity: 0.4,
+            bottom: "14%",
+            right: "6%",
           }}
         >
-          <span className="text-3xl sm:text-5xl font-extrabold font-mono tracking-tight text-[#111]">
+          <span className="text-3xl sm:text-5xl font-black font-mono tracking-tight text-[#111]">
             40%
           </span>
-          <span className="mt-1 text-xs sm:text-sm font-semibold leading-tight text-[#111]/90">
+          <span className="mt-1 text-xs sm:text-sm font-bold leading-tight text-[#111]/90">
             Decreased in customer phone calls
           </span>
         </div>
@@ -436,7 +435,7 @@ export const ScrollHero: React.FC<ScrollHeroProps> = ({
         {/* ------------------------------------------------------------- */}
         {/* MINIMAL BOTTOM HUD BAR (Discreet, centered, non-intrusive) */}
         {/* ------------------------------------------------------------- */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-4 px-5 py-2 rounded-full glass-panel text-xs font-mono text-gray-300 shadow-2xl">
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-1.5 sm:py-2 rounded-full glass-panel text-xs font-mono text-gray-300 shadow-2xl">
           <div className="flex items-center gap-1.5 text-emerald-400">
             <ArrowDown className="w-3.5 h-3.5 animate-bounce" />
             <span className="text-[11px] font-semibold text-gray-300 hidden sm:inline">
